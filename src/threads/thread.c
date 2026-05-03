@@ -61,7 +61,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
-static int load_avg; /*Electron*/
+static fixed_t load_avg; /*Electron*/
 
 static void kernel_thread (thread_func *, void *aux);
 
@@ -106,9 +106,9 @@ thread_init (void)
   /*Electron*/
   if(thread_mlfqs)
   {
-    load_avg = 0;
+    load_avg =INT_TO_FP(0);
     initial_thread->nice = 0;
-    initial_thread->recent_cpu = 0;
+    initial_thread->recent_cpu = INT_TO_FP(0);
   }
 
 }
@@ -158,21 +158,31 @@ thread_tick (void)
         {
           mlfqs_calc_load_avg ();                          /* first  */
           thread_foreach (mlfqs_calc_recent_cpu, NULL);   /* second */
-          
+          thread_foreach (mlfqs_priority_wrapper, NULL); 
+          intr_yield_on_return ();                         
         }
-
       /* 3. Every 4 ticks: recalculate priority for all threads */
-      if (timer_ticks () % 4 == 0)
+      else if (timer_ticks () % 4 == 0)
       {
         thread_foreach (mlfqs_priority_wrapper, NULL);
-        intr_yield_on_return ();
+        // intr_yield_on_return ();
+        struct thread *cur = thread_current();
+        if (!list_empty(&ready_list)) {
+        struct thread *highest = list_entry(
+            list_max(&ready_list, thread_priority_cmp, NULL),
+            struct thread, elem);
+        if (highest->priority > cur->priority)
+            intr_yield_on_return();
+
       }
   }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  }
 }
+
 
 /* Prints thread statistics. */
 void
@@ -244,6 +254,12 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  if (thread_mlfqs)
+  {
+    if (t->priority > thread_current ()->priority)
+      thread_yield ();
+  }
+  
   return tid;
 }
 
@@ -262,7 +278,7 @@ mlfqs_calc_priority (struct thread *t)
 
   /* priority = PRI_MAX - (recent_cpu / 4) - (nice * 2) */
   int pri = PRI_MAX
-             - FP_TO_INT (DIV_MIXED (t->recent_cpu, 4))
+             - FP_TO_INT(DIV_MIXED (t->recent_cpu, 4))
              - (t->nice * 2);
 
   /* Clamp to valid range */
@@ -284,8 +300,8 @@ mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED)
     return;
 
   /* decay = (2 * load_avg) / (2 * load_avg + 1) */
-  int two_load = MUL_MIXED (load_avg, 2);
-  int decay    = DIV_FP (two_load, ADD_MIXED (two_load, 1));
+  fixed_t two_load = MUL_MIXED (load_avg, 2);
+  fixed_t decay    = DIV_FP (two_load, ADD_MIXED (two_load, 1));
 
   /* recent_cpu = decay * recent_cpu + nice */
   t->recent_cpu = ADD_MIXED (MUL_FP (decay, t->recent_cpu), t->nice);
@@ -305,13 +321,13 @@ mlfqs_calc_load_avg (void)
     ready++;
 
   /* load_avg = (59/60)*load_avg + (1/60)*ready */
-  int c59_60 = DIV_FP (INT_TO_FP (59), INT_TO_FP (60));
-  int c1_60  = DIV_FP (INT_TO_FP (1),  INT_TO_FP (60));
+  fixed_t c59_60 = DIV_FP (INT_TO_FP (59), INT_TO_FP (60));
+  fixed_t c1_60  = DIV_FP (INT_TO_FP (1),  INT_TO_FP (60));
 
   load_avg = ADD_FP (MUL_FP  (c59_60, load_avg),
                     MUL_MIXED (c1_60,  ready));
-  if (load_avg < 0)
-      load_avg = 0;
+  if (load_avg < 0)       
+  load_avg = INT_TO_FP (0);
 }
 
 /* ============================================================
@@ -366,13 +382,26 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
+
   list_push_back (&ready_list, &t->elem);
+
   t->status = THREAD_READY;
+
   intr_set_level (old_level);
 
-   if (!intr_context () && 
-      t->priority > thread_current ()->priority)
-    thread_yield ();
+
+  /* if (intr_context ())
+    {
+       // inside interrupt — schedule after interrupt returns 
+      if (t->priority >= thread_current ()->priority)
+        intr_yield_on_return ();
+    }
+  else 
+    {
+      // outside interrupt — yield immediately 
+      if (t->priority >= thread_current ()->priority)
+        thread_yield (); 
+    } */
 }
 
 /* Returns the name of the running thread. */
@@ -441,9 +470,14 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
+  {
     list_push_back (&ready_list, &cur->elem);
+  }
+    
   cur->status = THREAD_READY;
+
   schedule ();
+
   intr_set_level (old_level);
 }
 
@@ -646,12 +680,11 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-  {
+
     struct list_elem *max_elem = list_max (&ready_list, thread_priority_cmp, NULL);
     list_remove (max_elem);
     return list_entry (max_elem, struct thread, elem);
-  }
+  
 }
 
 /* Completes a thread switch by activating the new thread's page

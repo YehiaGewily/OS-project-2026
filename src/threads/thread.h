@@ -89,7 +89,7 @@ struct thread        /*ُElectron*/
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
       int nice;                         /* Niceness OF a THREAD */
-      int recent_cpu;                 /* Cpu time which needed from the thread */  
+      fixed_t recent_cpu;                 /* Cpu time which needed from the thread */  
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 
