@@ -103,6 +103,8 @@ struct thread        /*ُElectron*/
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+    int64_t wake_tick;              /* Tick to wake up at if sleeping. */
+
   };
 
 /* If false (default), use round-robin scheduler.

@@ -129,7 +129,18 @@ thread_start (void)
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
-
+void
+thread_wake_sleeping (int64_t current_ticks)
+{
+  struct list_elem *e = list_begin (&all_list);
+  while (e != list_end (&all_list))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      e = list_next (e);
+      if (t->status == THREAD_BLOCKED && t->wake_tick <= current_ticks)
+        thread_unblock (t);
+    }
+}
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
