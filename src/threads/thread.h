@@ -145,5 +145,7 @@ void mlfqs_calc_priority (struct thread *t);
 void mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED);
 void mlfqs_calc_load_avg (void);
 void mlfqs_priority_wrapper (struct thread *t, void *aux UNUSED);
+void sort_ready_list_wrapper (void);
 bool thread_priority_cmp (const struct list_elem *a,const struct list_elem *b,void *aux);
+
 #endif /* threads/thread.h */

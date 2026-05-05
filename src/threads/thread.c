@@ -147,40 +147,9 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  if(thread_mlfqs)
-  {
-      /* 1. Every tick: increment recent_cpu for current thread */
-      if (t != idle_thread)
-        t->recent_cpu = ADD_MIXED (t->recent_cpu, 1);
-
-      /* 2. Every second: update load_avg then all recent_cpu values */
-      if (timer_ticks () % TIMER_FREQ == 0)
-        {
-          mlfqs_calc_load_avg ();                          /* first  */
-          thread_foreach (mlfqs_calc_recent_cpu, NULL);   /* second */
-          thread_foreach (mlfqs_priority_wrapper, NULL); 
-          intr_yield_on_return ();                         
-        }
-      /* 3. Every 4 ticks: recalculate priority for all threads */
-      else if (timer_ticks () % 4 == 0)
-      {
-        thread_foreach (mlfqs_priority_wrapper, NULL);
-        // intr_yield_on_return ();
-        struct thread *cur = thread_current();
-        if (!list_empty(&ready_list)) {
-        struct thread *highest = list_entry(
-            list_max(&ready_list, thread_priority_cmp, NULL),
-            struct thread, elem);
-        if (highest->priority > cur->priority)
-            intr_yield_on_return();
-
-      }
-  }
-
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
-  }
 }
 
 
@@ -278,7 +247,7 @@ mlfqs_calc_priority (struct thread *t)
 
   /* priority = PRI_MAX - (recent_cpu / 4) - (nice * 2) */
   int pri = PRI_MAX
-             - FP_TO_INT(DIV_MIXED (t->recent_cpu, 4))
+             - FP_TO_INT_ROUND(DIV_MIXED (t->recent_cpu, 4))
              - (t->nice * 2);
 
   /* Clamp to valid range */
@@ -348,6 +317,10 @@ thread_priority_cmp (const struct list_elem *a,
        < list_entry (b, struct thread, elem)->priority;
 }
 
+void sort_ready_list_wrapper ()
+{
+  list_sort(&ready_list, thread_priority_cmp, NULL);
+}
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -383,7 +356,7 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
 
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_cmp, NULL);
 
   t->status = THREAD_READY;
 
@@ -471,16 +444,18 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread) 
   {
-    list_push_back (&ready_list, &cur->elem);
-  }
-    
+    if(thread_mlfqs)
+    {
+      list_insert_ordered (&ready_list, &cur->elem, thread_priority_cmp, NULL);
+    }
+  } 
   cur->status = THREAD_READY;
 
   schedule ();
 
   intr_set_level (old_level);
-}
 
+}
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -504,18 +479,6 @@ thread_set_priority (int new_priority)
 {
   if (thread_mlfqs)   // MLFQS ignores manual priority setting
     return;
-
-  thread_current ()->priority = new_priority;
-
-  if (!list_empty (&ready_list))
-  {
-    struct thread *highest = list_entry (
-        list_max (&ready_list, thread_priority_cmp, NULL),
-        struct thread, elem);
-
-    if (highest->priority > thread_current ()->priority)
-      thread_yield ();
-  }
 }
 
 /* Returns the current thread's priority. */
@@ -530,15 +493,15 @@ void
 thread_set_nice (int nice )  /* Electron */
 {
   thread_current()->nice = nice;
-  mlfqs_calc_priority (thread_current ());
-  
+  struct thread * t = thread_current();
+  mlfqs_calc_priority (t);
   /* Yield if we're no longer the highest-priority thread */
   if (!list_empty (&ready_list))
     {
       struct thread *highest =
           list_entry (list_max (&ready_list, thread_priority_cmp, NULL),
                       struct thread, elem);
-      if (highest->priority > thread_current ()->priority)
+      if (highest->priority > t->priority)
         thread_yield ();
     }
 }
@@ -769,7 +732,7 @@ allocate_tid (void)
 
   return tid;
 }
-
+
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);

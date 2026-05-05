@@ -38,7 +38,7 @@ typedef int fixed_t;
 /* ---- Multiplication ------------------------------------------------ */
 
 /* fixed * fixed  (must use int64_t to prevent overflow!) */
-#define MUL_FP(x, y)        (((int64_t)(x) * (y) / (F)))
+#define MUL_FP(x, y)        ((int)((int64_t)(x) * (y) / (F)))
 
 /* fixed * integer */
 #define MUL_MIXED(x, n)     ((x) * (n))
@@ -46,7 +46,7 @@ typedef int fixed_t;
 /* ---- Division ------------------------------------------------------ */
 
 /* fixed / fixed  (must use int64_t to prevent overflow!) */
-#define DIV_FP(x, y)        (((int64_t)(x) * (F) / (y)))
+#define DIV_FP(x, y)        ((int)((int64_t)(x) * (F) / (y)))
 
 /* fixed / integer */
 #define DIV_MIXED(x, n)     ((x) / (n))
