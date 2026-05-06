@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "threads/fixed_point.h"
 
+struct lock;  /* Forward declaration for lock_waiting. */
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -91,6 +93,9 @@ struct thread        /*ُElectron*/
       int nice;                         /* Niceness OF a THREAD */
       fixed_t recent_cpu;                 /* Cpu time which needed from the thread */  
     int priority;                       /* Priority. */
+    int base_priority;                  /* Base priority (before donation). */
+    struct list locks_held;             /* Locks held by this thread. */
+    struct lock *lock_waiting;          /* Lock this thread is waiting on. */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -116,6 +121,7 @@ void thread_init (void);
 void thread_start (void);
 
 void thread_tick (void);
+void thread_wake_sleeping (int64_t current_ticks);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
@@ -149,5 +155,12 @@ void mlfqs_calc_load_avg (void);
 void mlfqs_priority_wrapper (struct thread *t, void *aux UNUSED);
 void sort_ready_list_wrapper (void);
 bool thread_priority_cmp (const struct list_elem *a,const struct list_elem *b,void *aux);
+
+bool thread_cmp_priority (const struct list_elem *a,
+                          const struct list_elem *b,
+                          void *aux);
+void thread_yield_if_not_highest (void);
+void thread_donate_priority (void);
+void thread_update_priority (struct thread *t);
 
 #endif /* threads/thread.h */
