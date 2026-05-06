@@ -90,8 +90,8 @@ struct thread        /*ُElectron*/
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-      int nice;                         /* Niceness OF a THREAD */
-      fixed_t recent_cpu;                 /* Cpu time which needed from the thread */  
+      int nice;                         /* Niceness OF a THREAD */ /*Electron*/
+      fixed_t recent_cpu;                 /* Cpu time which needed from the thread */  /*Electron*/
     int priority;                       /* Priority. */
     int base_priority;                  /* Base priority (before donation). */
     struct list locks_held;             /* Locks held by this thread. */
@@ -149,14 +149,14 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void mlfqs_calc_priority (struct thread *t);
-void mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED);
-void mlfqs_calc_load_avg (void);
-void mlfqs_priority_wrapper (struct thread *t, void *aux UNUSED);
-void sort_ready_list_wrapper (void);
-bool thread_priority_cmp (const struct list_elem *a,const struct list_elem *b,void *aux);
+void mlfqs_calc_priority (struct thread *t); /*Electron*/
+void mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED);  /*Electron*/
+void mlfqs_calc_load_avg (void); /*Electron*/
+void mlfqs_priority_wrapper (struct thread *t, void *aux UNUSED); /*Electron*/
+void sort_ready_list_wrapper (void);   /*Electron*/
+bool thread_priority_cmp (const struct list_elem *a,const struct list_elem *b,void *aux); /*Electron*/
 
-bool thread_cmp_priority (const struct list_elem *a,
+bool thread_cmp_priority (const struct list_elem *a,     
                           const struct list_elem *b,
                           void *aux);
 void thread_yield_if_not_highest (void);

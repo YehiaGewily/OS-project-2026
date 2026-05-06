@@ -16,9 +16,7 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
-/*
-Done by El-Dakhlawy and Gewily
-*/
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -165,7 +163,7 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  if (thread_mlfqs)
+  if (thread_mlfqs) /* Electron */
     {
       /* Every tick: increment recent_cpu for running thread (unless idle). */
       if (t != idle_thread)
@@ -291,8 +289,8 @@ mlfqs_calc_priority (struct thread *t)
   pri_fp = SUB_MIXED (pri_fp, t->nice * 2);
 
   int pri = FP_TO_INT (pri_fp);
-  if (pri > PRI_MAX) pri = PRI_MAX;
-  if (pri < PRI_MIN) pri = PRI_MIN;
+  if (pri > PRI_MAX) pri = PRI_MAX; /*Clamp*/
+  if (pri < PRI_MIN) pri = PRI_MIN; /*Clamp*/
   t->priority = pri;
 }
 
@@ -301,7 +299,7 @@ mlfqs_calc_priority (struct thread *t)
    Recalculate one thread's recent_cpu.
    Called every second via thread_foreach().
    ============================================================ */
-void
+void /*Electron*/
 mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED)
 {
   if (t == idle_thread)
@@ -320,7 +318,7 @@ mlfqs_calc_recent_cpu (struct thread *t, void *aux UNUSED)
    Update the system-wide load average.
    Called every second BEFORE recalculating recent_cpu.
    ============================================================ */
-void
+void /*Electron*/
 mlfqs_calc_load_avg (void)
 {
   /* Count runnable threads (ready + current, excluding idle) */
@@ -341,13 +339,13 @@ mlfqs_calc_load_avg (void)
 /* ============================================================
    Wrapper for thread_foreach (needs void* aux param)
    ============================================================ */
-void
+void /*Electron*/
 mlfqs_priority_wrapper (struct thread *t, void *aux UNUSED)
 {
   mlfqs_calc_priority (t);
 }
-
-bool
+/* Priority comparator: returns true if a < b (Ascending order). */
+bool  
 thread_priority_cmp (const struct list_elem *a,
                      const struct list_elem *b,
                      void *aux UNUSED)
@@ -356,7 +354,7 @@ thread_priority_cmp (const struct list_elem *a,
        < list_entry (b, struct thread, elem)->priority;
 }
 
-void sort_ready_list_wrapper ()
+void sort_ready_list_wrapper () /*Electron*/
 {
   list_sort(&ready_list, thread_priority_cmp, NULL);
 }
@@ -472,19 +470,6 @@ thread_unblock (struct thread *t)
 
   intr_set_level (old_level);
 
-
-  /* if (intr_context ())
-    {
-       // inside interrupt — schedule after interrupt returns 
-      if (t->priority >= thread_current ()->priority)
-        intr_yield_on_return ();
-    }
-  else 
-    {
-      // outside interrupt — yield immediately 
-      if (t->priority >= thread_current ()->priority)
-        thread_yield (); 
-    } */
 }
 
 /* Returns the name of the running thread. */
@@ -625,14 +610,14 @@ thread_get_nice (void) /* Electron */
 
 /* Returns 100 times the system load average. */
 int
-thread_get_load_avg (void) 
+thread_get_load_avg (void)  /* Electron */
 {
   return FP_TO_INT_ROUND (MUL_MIXED (load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
-thread_get_recent_cpu (void) 
+thread_get_recent_cpu (void)  /* Electron */
 {
   return FP_TO_INT_ROUND (MUL_MIXED (thread_current ()->recent_cpu, 100));
 }
@@ -685,7 +670,7 @@ kernel_thread (thread_func *function, void *aux)
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
 }
-
+
 /* Returns the running thread. */
 struct thread *
 running_thread (void) 
