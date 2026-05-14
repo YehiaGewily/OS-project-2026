@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/fixed_point.h"
+#include "threads/synch.h"
 
 struct lock;  /* Forward declaration for lock_waiting. */
 
@@ -26,6 +27,20 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define MAX_FDS 128                     /* Max open file descriptors per process. */
+
+/* Tracks a child process's status for wait/exec synchronization. */
+struct child_process
+  {
+    tid_t tid;                          /* Child's tid. */
+    int exit_status;                    /* Child's exit status. */
+    bool exited;                        /* True if child has exited. */
+    bool waited;                        /* True if parent already waited. */
+    bool load_success;                  /* True if child loaded successfully. */
+    struct semaphore wait_sema;         /* Parent blocks here in wait(). */
+    struct semaphore load_sema;         /* Parent blocks here in exec(). */
+    struct list_elem elem;              /* Element in parent's children list. */
+  };
 
 /* A kernel thread or user process.
 
@@ -104,6 +119,12 @@ struct thread        /*ُElectron*/
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct list children;               /* List of child_process structs. */
+    struct child_process *my_cp;        /* This thread's child_process (owned by parent). */
+    struct file *exec_file;             /* Executable file (kept open to deny writes). */
+    struct file **fd_table;             /* File descriptor table. */
+    int next_fd;                        /* Next file descriptor to allocate. */
+    int exit_status;                    /* Exit status for this process. */
 #endif
 
     /* Owned by thread.c. */
